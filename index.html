@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון ציונים בחינוך גופני</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Assistant', sans-serif;
+        }
+        .rtl { direction: rtl; }
+        .ltr { direction: ltr; }
+        .form-input, .form-select, .btn {
+            transition: all 0.3s ease-in-out;
+        }
+        .form-input:focus, .form-select:focus {
+            box-shadow: 0 0 0 2px #3b82f6;
+            border-color: #3b82f6;
+        }
+        #resultsTable th, #resultsTable td {
+            padding: 12px 15px;
+            text-align: right;
+        }
+         /* Modal styles */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 40;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem 2rem;
+            border-radius: 0.75rem;
+            width: 95%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .gemini-output {
+            white-space: pre-wrap;
+            text-align: right;
+            line-height: 1.7;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Calculator Card -->
+        <div class="w-full max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg mb-8">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">מחשבון ציונים בחינוך גופני</h1>
+            <div class="space-y-4">
+                <div>
+                    <label for="studentName" class="block text-lg font-medium text-gray-700">שם התלמיד/ה</label>
+                    <input type="text" id="studentName" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg" placeholder="לדוגמה: ישראל ישראלי">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="gradeLevel" class="block text-lg font-medium text-gray-700">שכבה</label>
+                        <select id="gradeLevel" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg">
+                            <option value="ז">ז'</option>
+                            <option value="ח">ח'</option>
+                            <option value="ט">ט'</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="classNumber" class="block text-lg font-medium text-gray-700">מס' כיתה</label>
+                        <input type="number" id="classNumber" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg" min="1" max="15" placeholder="1-15">
+                    </div>
+                </div>
+                <div>
+                    <label for="testType" class="block text-lg font-medium text-gray-700">סוג המבדק</label>
+                    <select id="testType" class="form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg"></select>
+                </div>
+                <div>
+                    <label for="result" class="block text-lg font-medium text-gray-700">תוצאה</label>
+                    <div class="relative">
+                         <input type="text" id="result" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg" placeholder="הזן תוצאה">
+                         <span id="unit" class="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500"></span>
+                    </div>
+                </div>
+                <button id="calculateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg text-xl shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    חשב ציון
+                </button>
+            </div>
+            <div id="resultDisplay" class="mt-6 text-center text-2xl font-bold text-gray-800 min-h-[5rem] flex flex-col justify-center items-center"></div>
+        </div>
+
+        <!-- Saved Results Card -->
+        <div class="w-full max-w-5xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+             <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <h2 class="text-2xl font-bold text-gray-800">תוצאות שמורות</h2>
+                <div class="flex flex-wrap justify-center gap-2">
+                    <button id="analyzeBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg flex items-center gap-2">✨ נתח ביצועי כיתה</button>
+                    <button id="exportBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg">ייצוא ל-CSV</button>
+                    <button id="clearBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:shadow-lg">נקה הכל</button>
+                </div>
+            </div>
+             <p class="text-sm text-gray-500 mb-4 text-center">הנתונים נשמרים באופן מקומי בדפדפן שלך.</p>
+            <div class="overflow-x-auto">
+                <table id="resultsTable" class="w-full text-lg">
+                    <thead class="bg-gray-200">
+                        <tr>
+                            <th class="font-bold">שם</th>
+                            <th class="font-bold">שכבה</th>
+                            <th class="font-bold">כיתה</th>
+                            <th class="font-bold">מבדק</th>
+                            <th class="font-bold">תוצאה</th>
+                            <th class="font-bold">ציון</th>
+                            <th class="font-bold">פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody" class="divide-y divide-gray-200"></tbody>
+                </table>
+                 <p id="noResults" class="text-center text-gray-500 py-8">אין תוצאות שמורות.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="confirmationModal" class="modal-backdrop">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">אישור מחיקה</h3>
+            <p class="mb-6">האם אתה בטוח שברצונך למחוק את כל התוצאות השמורות? לא ניתן לשחזר פעולה זו.</p>
+            <div class="flex justify-center gap-4">
+                <button id="confirmClearBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">כן, מחק</button>
+                <button id="cancelClearBtn" class="bg-gray-300 hover:bg-gray-400 text-black font-bold py-2 px-6 rounded-lg">ביטול</button>
+            </div>
+        </div>
+    </div>
+    <div id="geminiModal" class="modal-backdrop">
+        <div id="geminiModalContent" class="modal-content">
+            <!-- Gemini response will be injected here -->
+        </div>
+    </div>
+
+
+    <script>
+        // Data parsed from the provided documents.
+        const gradesData = {
+            'ז': {
+                'ריצת 60 מטר': { type: 'time', unit: 'שניות', data: { '9.00': 100, '9.04': 99, '9.08': 98, '9.12': 97, '9.16': 96, '9.20': 95, '9.24': 94, '9.28': 93, '9.32': 92, '9.36': 91, '9.40': 90, '9.46': 89, '9.50': 88, '9.54': 87, '9.56': 86, '9.60': 85, '9.64': 84, '9.68': 83, '9.72': 82, '9.76': 81, '9.80': 80, '9.86': 79, '9.90': 78, '9.94': 77, '10.00': 76, '10.06': 75, '10.10': 74, '10.20': 73, '10.30': 72, '10.40': 71, '10.50': 70, '10.60': 69, '10.70': 68, '10.80': 67, '10.90': 66, '11.00': 65, '11.04': 64, '11.06': 63, '11.08': 62, '11.10': 61, '11.20': 60, '11.30': 59, '11.40': 58, '11.50': 57, '11.60': 56, '11.70': 55, '11.80': 54, '11.90': 53, '12.00': 52, '12.05': 51, '12.10': 50 } },
+                'קפיצה למרחק מהמקום': { type: 'distance', unit: 'ס"מ', data: { '200': 100, '197': 99, '194': 98, '192': 97, '190': 96, '188': 95, '186': 94, '184': 93, '182': 92, '180': 91, '178': 90, '176': 89, '174': 88, '172': 87, '170': 86, '168': 85, '166': 84, '164': 83, '162': 82, '160': 81, '158': 80, '156': 79, '154': 78, '152': 77, '150': 76, '147': 75, '144': 74, '141': 73, '138': 72, '135': 71, '132': 70, '129': 69, '126': 68, '123': 67, '120': 66, '117': 65, '114': 64, '111': 63, '108': 62, '105': 61, '102': 60, '98': 59, '95': 58, '93': 57, '91': 56, '89': 55, '87': 54, '85': 53, '83': 52, '81': 51, '80': 50 } },
+                'ריצת 4x10': { type: 'time', unit: 'שניות', data: { '10.00': 100, '10.1': 99, '10.2': 98, '10.3': 97, '10.4': 96, '10.5': 95, '10.6': 94, '10.7': 93, '10.8': 92, '10.9': 91, '11.0': 90, '11.1': 89, '11.2': 88, '11.3': 87, '11.4': 86, '11.5': 85, '11.6': 84, '11.7': 83, '11.8': 82, '11.9': 81, '12.0': 80, '12.1': 79, '12.2': 78, '12.3': 77, '12.4': 76, '12.5': 75, '12.6': 74, '12.7': 73, '12.8': 72, '12.9': 71, '13.0': 70, '13.1': 69, '13.2': 68, '13.3': 67, '13.4': 66, '13.5': 65, '13.6': 64, '13.7': 63, '13.8': 62, '13.9': 61, '14.0': 60, '14.2': 59, '14.4': 58, '14.6': 57, '14.8': 56, '15.0': 55, '15.1': 54, '15.2': 53, '15.3': 52, '15.4': 51, '15.5': 50 } },
+                'מתח': { type: 'reps', unit: 'חזרות', data: { '9': 100, '8': 97, '7': 94, '6': 90, '5': 85, '4': 80, '3': 70, '2': 65, '1': 60, '0': 55 } },
+                'ריצת 2000 מטר': { type: 'time', unit: 'דקות:שניות', data: { '8:00': 100, '8:10': 99, '8:20': 98, '8:28': 97, '8:51': 96, '8:59': 95, '9:09': 94, '9:16': 93, '9:25': 92, '9:34': 91, '9:43': 90, '9:52': 89, '10:02': 88, '10:12': 87, '10:22': 86, '10:32': 85, '10:43': 84, '10:54': 83, '11:05': 82, '11:16': 81, '11:27': 80, '11:38': 79, '11:50': 78, '12:02': 77, '12:14': 76, '12:26': 75, '12:40': 74, '12:56': 73, '13:10': 72, '13:24': 71, '13:38': 70, '13:52': 69, '14:07': 68, '14:22': 67, '14:37': 66, '14:52': 65, '15:06': 64, '15:18': 63, '15:30': 62, '15:38': 61, '15:50': 60, '16:02': 59, '16:13': 58, '16:24': 57, '16:35': 56, '16:46': 55, '16:56': 54, '17:06': 53, '17:16': 52, '17:26': 51, '17:36': 50 } },
+                'שכיבות סמיכה': { type: 'reps', unit: 'חזרות', data: { '30': 100, '29': 98, '28': 96, '27': 94, '26': 92, '25': 90, '24': 88, '23': 86, '22': 84, '21': 82, '20': 80, '19': 77, '18': 74, '17': 71, '16': 68, '15': 66, '14': 64, '13': 62, '12': 60, '11': 58, '10': 56, '9': 53, '8': 50 } },
+                'כפיפות בטן': { type: 'reps', unit: 'חזרות ב-60 שנ\'', data: { '60': 100, '59': 99, '58': 98, '57': 97, '56': 96, '55': 95, '54': 94, '53': 93, '52': 92, '51': 91, '50': 90, '49': 89, '48': 88, '47': 87, '46': 86, '45': 85, '44': 84, '43': 83, '42': 82, '41': 81, '40': 80, '39': 79, '38': 78, '37': 77, '36': 76, '35': 75, '34': 74, '33': 73, '32': 72, '31': 71, '30': 70, '29': 69, '28': 68, '27': 67, '26': 66, '25': 65, '24': 64, '23': 63, '22': 62, '21': 61, '20': 60, '19': 59, '18': 58, '17': 57, '16': 56, '15': 55, '14': 54, '13': 53, '12': 52, '11': 51, '10': 50 } },
+                'דלגית': { type: 'reps', unit: 'קפיצות ב-60 שנ\'', data: { '120': 100, '118': 99, '116': 98, '114': 97, '112': 96, '110': 95, '108': 94, '106': 93, '104': 92, '102': 91, '100': 90, '98': 89, '96': 88, '94': 87, '92': 86, '90': 85, '89': 84, '88': 83, '87': 82, '86': 81, '85': 80, '84': 79, '83': 78, '82': 77, '81': 76, '80': 75, '79': 74, '78': 73, '77': 72, '76': 71, '75': 70, '74': 69, '73': 68, '71': 67, '70': 65, '69': 64, '68': 63, '67': 62, '66': 61, '65': 60, '64': 59, '63': 58, '62': 57, '61': 56, '60': 55, '59': 54, '58': 53, '57': 52, '56': 51, '55': 50 } }
+            },
+            'ח': {
+                'ריצת 60 מטר': { type: 'time', unit: 'שניות', data: { '8.80': 100, '8.82': 99, '8.84': 98, '8.86': 97, '8.88': 96, '8.90': 95, '8.92': 94, '8.94': 93, '8.96': 92, '8.98': 91, '9.00': 90, '9.02': 89, '9.04': 88, '9.06': 87, '9.08': 86, '9.10': 85, '9.14': 84, '9.18': 83, '9.22': 82, '9.26': 81, '9.30': 80, '9.34': 79, '9.38': 78, '9.42': 77, '9.46': 76, '9.50': 75, '9.54': 74, '9.58': 73, '9.62': 72, '9.66': 71, '9.70': 70, '9.80': 69, '9.90': 68, '10.00': 67, '10.10': 66, '10.20': 65, '10.30': 64, '10.40': 63, '10.50': 62, '10.60': 61, '10.70': 60, '10.80': 59, '10.90': 58, '11.00': 57, '11.10': 56, '11.20': 55, '11.30': 54, '11.40': 53, '11.50': 52, '11.60': 51, '11.70': 50 } },
+                'קפיצה למרחק מהמקום': { type: 'distance', unit: 'ס"מ', data: { '210': 100, '208': 99, '206': 98, '204': 97, '202': 96, '200': 95, '198': 94, '196': 93, '194': 92, '192': 91, '190': 90, '187': 89, '184': 88, '181': 87, '178': 86, '175': 85, '172': 84, '170': 83, '167': 82, '164': 81, '161': 80, '158': 79, '156': 78, '154': 77, '152': 76, '150': 75, '147': 74, '145': 73, '142': 72, '140': 71, '138': 70, '136': 69, '134': 68, '132': 67, '129': 66, '126': 65, '123': 64, '120': 63, '117': 62, '115': 61, '112': 60, '110': 59, '108': 58, '107': 57, '103': 56, '100': 55, '98': 54, '95': 53, '92': 52, '89': 51, '87': 50 } },
+                'ריצת 4x10': { type: 'time', unit: 'שניות', data: { '9.8': 100, '9.9': 99, '10.0': 98, '10.1': 97, '10.2': 96, '10.3': 95, '10.4': 94, '10.5': 93, '10.6': 92, '10.7': 91, '10.8': 90, '10.9': 89, '11.0': 88, '11.1': 87, '11.2': 86, '11.3': 85, '11.4': 84, '11.5': 83, '11.6': 82, '11.7': 81, '11.8': 80, '11.9': 79, '12.0': 78, '12.1': 77, '12.2': 76, '12.3': 75, '12.4': 74, '12.5': 73, '12.6': 72, '12.7': 71, '12.8': 70, '12.9': 69, '13.0': 68, '13.1': 67, '13.2': 66, '13.3': 65, '13.4': 64, '13.5': 63, '13.6': 62, '13.7': 61, '13.8': 60, '13.9': 59, '14.0': 58, '14.2': 57, '14.4': 56, '14.6': 55, '14.8': 54, '14.9': 53, '15.0': 52, '15.1': 51, '15.2': 50 } },
+                'מתח': { type: 'reps', unit: 'חזרות', data: { '10': 100, '9': 97, '8': 94, '7': 89, '6': 85, '5': 80, '4': 75, '3': 70, '2': 65, '1': 60, '0': 55 } },
+                'ריצת 2000 מטר': { type: 'time', unit: 'דקות:שניות', data: { '7:54': 100, '8:00': 99, '8:07': 98, '8:14': 97, '8:21': 96, '8:28': 95, '8:35': 94, '8:43': 93, '8:52': 92, '8:59': 91, '9:09': 90, '9:16': 89, '9:25': 88, '9:34': 87, '9:43': 86, '9:52': 85, '10:02': 84, '10:12': 83, '10:22': 82, '10:32': 81, '10:43': 80, '10:54': 79, '11:05': 78, '11:16': 77, '11:27': 76, '11:38': 75, '11:50': 74, '12:02': 73, '12:14': 72, '12:26': 71, '12:40': 70, '12:56': 69, '13:10': 68, '13:24': 67, '13:38': 66, '13:52': 65, '14:07': 64, '14:22': 63, '14:37': 62, '14:52': 61, '15:08': 60, '15:24': 59, '15:30': 58, '15:38': 57, '15:50': 56, '16:02': 55, '16:13': 54, '16:24': 53, '16:35': 52, '16:46': 51, '16:56': 50 } },
+                'שכיבות סמיכה': { type: 'reps', unit: 'חזרות', data: { '35': 100, '34': 98, '33': 96, '32': 94, '31': 92, '30': 90, '29': 88, '28': 86, '27': 84, '26': 82, '25': 80, '24': 78, '23': 76, '22': 74, '21': 72, '20': 70, '19': 68, '18': 65, '17': 62, '16': 59, '15': 56, '14': 54, '13': 52, '12': 50 } },
+                'כפיפות בטן': { type: 'reps', unit: 'חזרות ב-60 שנ\'', data: { '70': 100, '69': 99, '68': 98, '67': 97, '66': 96, '65': 95, '64': 94, '63': 93, '62': 92, '61': 91, '60': 90, '59': 89, '58': 88, '57': 87, '56': 86, '55': 85, '54': 84, '53': 83, '51': 82, '50': 81, '48': 80, '46': 79, '44': 78, '42': 77, '40': 76, '38': 75, '37': 74, '36': 73, '35': 72, '34': 71, '33': 70, '32': 69, '31': 68, '30': 67, '29': 66, '27': 65, '25': 64, '23': 63, '22': 62, '21': 61, '20': 58, '19': 55, '18': 50 } },
+                'דלגית': { type: 'reps', unit: 'קפיצות ב-60 שנ\'', data: { '130': 100, '127': 99, '124': 98, '121': 97, '119': 96, '117': 95, '115': 94, '112': 93, '110': 92, '108': 91, '106': 90, '104': 89, '101': 88, '98': 87, '96': 86, '94': 85, '92': 84, '90': 83, '87': 82, '84': 81, '83': 80, '82': 79, '81': 78, '80': 77, '79': 76, '77': 75, '75': 74, '73': 73, '72': 72, '71': 71, '70': 70, '68': 69, '67': 68, '66': 67, '64': 66, '62': 65, '60': 64, '59': 63, '58': 62, '57': 61, '56': 60, '54': 59, '52': 58, '50': 57, '49': 56, '48': 55, '47': 54, '46': 53, '45': 52, '44': 51, '43': 50 } }
+            },
+            'ט': {
+                'ריצת 60 מטר': { type: 'time', unit: 'שניות', data: { '8.50': 100, '8.55': 99, '8.60': 98, '8.65': 97, '8.70': 96, '8.75': 95, '8.80': 94, '8.85': 93, '8.90': 92, '8.95': 91, '9.00': 90, '9.05': 89, '9.10': 88, '9.15': 87, '9.20': 86, '9.25': 85, '9.30': 84, '9.35': 83, '9.40': 82, '9.45': 81, '9.50': 80, '9.55': 79, '9.58': 78, '9.60': 77, '9.70': 76, '9.75': 75, '9.80': 74, '9.85': 73, '9.90': 72, '9.95': 71, '10.00': 70, '10.02': 69, '10.04': 68, '10.06': 67, '10.08': 66, '10.10': 65, '10.12': 64, '10.14': 63, '10.16': 62, '10.18': 61, '10.20': 60, '10.22': 59, '10.24': 58, '10.26': 57, '10.28': 56, '10.30': 55, '10.35': 54, '10.40': 53, '10.42': 52, '10.45': 51, '10.50': 50 } },
+                'קפיצה למרחק מהמקום': { type: 'distance', unit: 'מטרים', data: { '2.20': 100, '2.18': 99, '2.16': 98, '2.14': 97, '2.12': 96, '2.10': 95, '2.08': 94, '2.06': 93, '2.04': 92, '2.02': 91, '2.00': 90, '1.98': 89, '1.96': 88, '1.94': 87, '1.92': 86, '1.90': 85, '1.88': 84, '1.86': 83, '1.84': 82, '1.82': 81, '1.80': 80, '1.78': 79, '1.76': 78, '1.74': 77, '1.72': 76, '1.70': 75, '1.68': 74, '1.66': 73, '1.64': 72, '1.62': 71, '1.60': 70, '1.58': 69, '1.56': 68, '1.54': 67, '1.52': 66, '1.50': 65, '1.46': 64, '1.43': 63, '1.39': 62, '1.36': 61, '1.33': 60, '1.30': 59, '1.27': 58, '1.24': 57, '1.21': 56, '1.18': 55, '1.15': 54, '1.12': 53, '1.09': 52, '1.04': 51, '1.00': 50 } },
+                'ריצת 4x10': { type: 'time', unit: 'שניות', data: { '9.5': 100, '9.6': 99, '9.7': 98, '9.8': 97, '9.9': 96, '10.0': 95, '10.1': 94, '10.2': 93, '10.3': 92, '10.4': 91, '10.5': 90, '10.6': 89, '10.7': 88, '10.8': 87, '10.9': 86, '11.0': 85, '11.1': 84, '11.2': 83, '11.3': 82, '11.4': 81, '11.5': 80, '11.6': 79, '11.7': 78, '11.8': 77, '11.9': 76, '12.0': 75, '12.1': 74, '12.2': 73, '12.3': 72, '12.4': 71, '12.5': 70, '12.6': 69, '12.7': 68, '12.8': 67, '12.9': 66, '13.0': 65, '13.1': 64, '13.2': 63, '13.4': 62, '13.5': 61, '13.6': 60, '13.7': 59, '13.8': 58, '13.9': 57, '14.0': 56, '14.2': 55, '14.4': 54, '14.6': 53, '14.8': 52, '14.9': 51, '15.0': 50 } },
+                'מתח': { type: 'reps', unit: 'חזרות', data: { '14': 100, '13': 97, '12': 93, '11': 90, '10': 88, '9': 86, '8': 83, '7': 80, '6': 77, '5': 73, '4': 70, '3': 66, '2': 60, '1': 55, '0': 50 } },
+                'ריצת 2000 מטר': { type: 'time', unit: 'דקות:שניות', data: { '7:40': 100, '7:45': 99, '7:52': 98, '7:59': 97, '8:07': 96, '8:16': 95, '8:21': 94, '8:28': 93, '8:35': 92, '8:43': 91, '8:52': 90, '8:59': 89, '9:09': 88, '9:16': 87, '9:25': 86, '9:34': 85, '9:43': 84, '9:52': 83, '10:01': 82, '10:12': 81, '10:20': 80, '10:28': 79, '10:38': 78, '10:47': 77, '10:54': 76, '11:05': 75, '11:16': 74, '11:27': 73, '11:38': 72, '11:50': 71, '12:02': 70, '12:14': 69, '12:26': 68, '12:40': 67, '12:56': 66, '13:10': 65, '13:24': 64, '13:38': 63, '13:52': 62, '14:07': 61, '14:22': 60, '14:37': 59, '14:52': 58, '15:08': 57, '15:24': 56, '15:40': 55, '15:56': 54, '16:11': 53, '16:26': 52, '16:43': 51, '16:50': 50 } },
+                'שכיבות סמיכה': { type: 'reps', unit: 'חזרות', data: { '38': 100, '37': 98, '36': 96, '35': 94, '34': 92, '33': 90, '32': 88, '31': 86, '30': 84, '29': 82, '28': 80, '27': 78, '26': 76, '25': 74, '24': 72, '23': 70, '22': 68, '21': 66, '20': 64, '19': 62, '18': 60, '17': 58, '16': 56, '15': 54, '14': 52, '13': 50 } },
+                'כפיפות בטן': { type: 'reps', unit: 'חזרות ב-60 שנ\'', data: { '80': 100, '79': 99, '78': 98, '77': 97, '76': 96, '75': 95, '74': 94, '73': 93, '72': 92, '71': 91, '70': 90, '69': 89, '68': 88, '67': 87, '66': 86, '65': 85, '64': 84, '63': 83, '62': 82, '61': 81, '60': 80, '58': 79, '56': 78, '54': 77, '52': 76, '50': 75, '48': 74, '46': 73, '44': 72, '42': 71, '40': 70, '39': 69, '38': 68, '37': 67, '36': 66, '35': 65, '34': 64, '33': 63, '32': 62, '30': 61, '29': 60, '28': 59, '27': 58, '26': 57, '25': 56, '24': 55, '22': 54, '21': 53, '20': 52, '19': 51, '18': 50 } },
+                'דלגית': { type: 'reps', unit: 'קפיצות ב-60 שנ\'', data: { '140': 100, '138': 99, '136': 98, '134': 97, '132': 96, '130': 95, '128': 94, '126': 93, '124': 92, '122': 91, '120': 90, '118': 89, '116': 88, '114': 87, '112': 86, '110': 85, '109': 84, '108': 83, '107': 82, '106': 81, '105': 80, '104': 79, '103': 78, '102': 77, '101': 76, '100': 75, '98': 74, '96': 73, '94': 72, '92': 71, '90': 70, '88': 69, '86': 68, '84': 67, '82': 66, '80': 65, '78': 64, '76': 63, '74': 62, '72': 61, '70': 60, '68': 59, '66': 58, '64': 57, '62': 56, '60': 55, '58': 54, '56': 53, '54': 52, '52': 51, '50': 50 } }
+            }
+        };
+
+        // DOM Elements
+        const studentNameInput = document.getElementById('studentName');
+        const classNumberInput = document.getElementById('classNumber');
+        const gradeLevelSelect = document.getElementById('gradeLevel');
+        const testTypeSelect = document.getElementById('testType');
+        const resultInput = document.getElementById('result');
+        const unitSpan = document.getElementById('unit');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const resultsBody = document.getElementById('resultsBody');
+        const noResultsP = document.getElementById('noResults');
+        const exportBtn = document.getElementById('exportBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const confirmModal = document.getElementById('confirmationModal');
+        const confirmClearBtn = document.getElementById('confirmClearBtn');
+        const cancelClearBtn = document.getElementById('cancelClearBtn');
+        const geminiModal = document.getElementById('geminiModal');
+        const geminiModalContent = document.getElementById('geminiModalContent');
+
+        // App State
+        let savedResults = [];
+        let lastCalculation = null;
+
+        // --- Gemini API ---
+        const API_KEY = ""; // Kept empty as per instructions
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+        
+        async function callGemini(prompt) {
+            showGeminiLoading(true);
+            try {
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!response.ok) {
+                    throw new Error(`שגיאת API: ${response.status}`);
+                }
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0) {
+                   const text = result.candidates[0].content.parts[0].text;
+                   showGeminiResult(text);
+                } else {
+                   throw new Error("לא התקבלה תשובה מהמודל.");
+                }
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                showGeminiResult(`שגיאה בהפקת הניתוח: ${error.message}`);
+            }
+        }
+        
+        function showGeminiLoading(isLoading, title = "מעבד בקשה...") {
+            if (isLoading) {
+                geminiModalContent.innerHTML = `
+                    <h3 class="text-xl font-bold mb-4">${title}</h3>
+                    <div class="loader"></div>
+                    <p>הבינה המלאכותית מנתחת את הנתונים, נא להמתין...</p>
+                `;
+                geminiModal.style.display = 'flex';
+            } else {
+                geminiModal.style.display = 'none';
+            }
+        }
+        
+        function showGeminiResult(text, title = "ניתוח והמלצות") {
+            geminiModalContent.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                     <h3 class="text-xl font-bold">${title}</h3>
+                     <button id="closeGeminiModal" class="text-gray-500 hover:text-gray-800">&times;</button>
+                </div>
+                <div class="gemini-output">${text}</div>
+            `;
+            geminiModal.style.display = 'flex';
+            document.getElementById('closeGeminiModal').addEventListener('click', () => geminiModal.style.display = 'none');
+        }
+
+        function generatePersonalFeedback() {
+            if (!lastCalculation) return;
+            const { name, gradeLevel, testType, result, score } = lastCalculation;
+            const prompt = `
+                אתה עוזר למורה לחינוך גופני. עליך לספק משוב ותוכנית אימונים לתלמיד על סמך הנתונים הבאים.
+                התשובה צריכה להיות בעברית, בטון חיובי ומעודד, ומנוסחת כך שהמורה יוכל להציג אותה לתלמיד.
+
+                פרטי התלמיד:
+                - שם: ${name}
+                - שכבה: ${gradeLevel}'
+                
+                פרטי המבדק:
+                - סוג המבדק: ${testType}
+                - התוצאה שהשיג: ${result}
+                - הציון שקיבל: ${score}
+
+                אנא ספק תשובה בפורמט הבא:
+                
+                **משוב עבור ${name}:**
+                [כאן כתוב משוב על ההישג. התייחס לתוצאה ולציון. למשל: "כל הכבוד על המאמץ! הגעת לתוצאה של ${result} וקיבלת את הציון ${score}, זוהי תוצאה טובה מאוד שמראה על..."]
+
+                **המלצות לשיפור:**
+                [כאן הצג 3-4 תרגילים ספציפיים וברורים שיכולים לעזור לתלמיד להשתפר במבדק זה. הסבר בקצרה איך כל תרגיל עוזר.]
+            `;
+            callGemini(prompt);
+        }
+
+        function generateClassAnalysis() {
+            if (savedResults.length < 3) {
+                alert("יש לשמור לפחות 3 תוצאות כדי להפיק ניתוח כיתתי.");
+                return;
+            }
+            const dataForAnalysis = JSON.stringify(savedResults.map(r => ({test: r.testType, grade: r.score})));
+            const prompt = `
+                אתה יועץ מומחה למורים לחינוך גופני. נתח את הנתונים הבאים, המייצגים הישגים של כיתה במבדקים שונים, וספק דוח קצר למורה.
+                הנתונים הם במבנה JSON של מערך אובייקטים, כאשר כל אובייקט הוא תוצאה של תלמיד.
+
+                נתונים:
+                ${dataForAnalysis}
+
+                על הדוח לכלול את הסעיפים הבאים בעברית:
+
+                **ניתוח ביצועי כיתה - סיכום:**
+                [סקירה כללית קצרה של ביצועי הכיתה על סמך הנתונים.]
+
+                **נקודות חוזק (המבדקים החזקים ביותר):**
+                [זהה 2-3 מבדקים שבהם הכיתה מראה ביצועים גבוהים בממוצע. ציין את שם המבדק והסבר מדוע הוא נקודת חוזק.]
+
+                **תחומים לשיפור (המבדקים המאתגרים ביותר):**
+                [זהה 2-3 מבדקים שבהם הציונים הממוצעים נמוכים יותר, והצע אותם כתחומים שכדאי להתמקד בהם בשיעורים הקרובים.]
+
+                **המלצה כללית:**
+                [ספק המלצה אחת כללית למורה על סמך הניתוח הכולל.]
+            `;
+             showGeminiLoading(true, "מנתח ביצועי כיתה...");
+             callGemini(prompt);
+        }
+
+        // --- Core App Logic (existing functions adapted) ---
+        
+        function populateTestTypes() {
+            const grade = gradeLevelSelect.value;
+            const tests = Object.keys(gradesData[grade]);
+            testTypeSelect.innerHTML = '';
+            tests.forEach(test => {
+                const option = document.createElement('option');
+                option.value = test;
+                option.textContent = test;
+                testTypeSelect.appendChild(option);
+            });
+            updateUnit();
+        }
+
+        function updateUnit() {
+            const grade = gradeLevelSelect.value;
+            const test = testTypeSelect.value;
+            if (gradesData[grade] && gradesData[grade][test]) {
+                 const { unit, type } = gradesData[grade][test];
+                 unitSpan.textContent = unit;
+                 resultInput.placeholder = type === 'time' && unit.includes('דקות') ? "לדוגמה: 9:30" : "הזן תוצאה";
+                 resultInput.classList.toggle('ltr', ['מטרים', 'ס"מ', 'שניות'].includes(unit));
+                 resultInput.classList.toggle('rtl', !['מטרים', 'ס"מ', 'שניות'].includes(unit));
+            }
+        }
+
+        function parseTime(timeStr) {
+            if (String(timeStr).includes(':')) {
+                const parts = String(timeStr).split(':');
+                return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+            }
+            return parseFloat(timeStr);
+        }
+
+        function handleCalculation() {
+            lastCalculation = null;
+            const grade = gradeLevelSelect.value;
+            const test = testTypeSelect.value;
+            let resultValue = resultInput.value.trim();
+
+            if (!resultValue) {
+                displayMessage('אנא הזן תוצאה.', 'error');
+                return;
+            }
+
+            const testInfo = gradesData[grade][test];
+            const table = testInfo.data;
+            const isTimeBased = testInfo.type === 'time';
+            
+            let studentResult;
+            if (isTimeBased && resultValue.includes(':')) {
+                const timeParts = resultValue.split(':');
+                if (timeParts.length !== 2 || isNaN(parseInt(timeParts[0])) || isNaN(parseFloat(timeParts[1].replace(',', '.')))) {
+                    displayMessage('פורמט זמן לא חוקי. השתמש ב-דקות:שניות.', 'error');
+                    return;
+                }
+                studentResult = parseTime(resultValue.replace(',', '.'));
+            } else {
+                studentResult = parseFloat(resultValue.replace(',', '.'));
+            }
+
+            if (isNaN(studentResult)) {
+                displayMessage('תוצאה לא חוקית.', 'error');
+                return;
+            }
+
+            let thresholds = Object.keys(table).map(k => isTimeBased ? parseTime(k) : parseFloat(k));
+            let finalGrade = null;
+            
+            if (isTimeBased) {
+                thresholds.sort((a, b) => a - b);
+                for (const threshold of thresholds) {
+                    if (studentResult <= threshold) {
+                        const originalKey = Object.keys(table).find(k => parseTime(k) === threshold);
+                        finalGrade = table[originalKey];
+                        break;
+                    }
+                }
+                if (finalGrade === null) { 
+                    finalGrade = table[Object.keys(table).find(k => parseTime(k) === thresholds[thresholds.length - 1])];
+                }
+            } else {
+                thresholds.sort((a, b) => b - a);
+                for (const threshold of thresholds) {
+                    if (studentResult >= threshold) {
+                        const originalKey = Object.keys(table).find(k => parseFloat(k) === threshold);
+                        finalGrade = table[originalKey];
+                        break;
+                    }
+                }
+                 if (finalGrade === null) {
+                    finalGrade = table[Object.keys(table).find(k => parseFloat(k) === thresholds[thresholds.length - 1])];
+                }
+            }
+            
+            displayResult(finalGrade);
+
+            lastCalculation = {
+                id: Date.now(),
+                name: studentNameInput.value.trim() || 'ללא שם',
+                gradeLevel: gradeLevelSelect.value,
+                classNum: classNumberInput.value || '-',
+                testType: testTypeSelect.value,
+                result: resultValue,
+                score: finalGrade
+            };
+        }
+
+        function displayMessage(message, type = 'info') {
+            resultDisplay.innerHTML = `<p class="${type === 'error' ? 'text-red-500' : 'text-gray-800'}">${message}</p>`;
+        }
+
+        function displayResult(finalGrade) {
+            resultDisplay.innerHTML = `
+                <p>הציון הוא: <span class="text-blue-600">${finalGrade}</span></p>
+                <div class="flex gap-2 justify-center mt-2">
+                    <button id="addBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg text-base shadow-md">הוסף לטבלה</button>
+                    <button id="feedbackBtn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg text-base shadow-md flex items-center gap-2">✨ משוב ואימון</button>
+                </div>
+            `;
+            document.getElementById('addBtn').addEventListener('click', addResultToTable);
+            document.getElementById('feedbackBtn').addEventListener('click', generatePersonalFeedback);
+        }
+
+        function addResultToTable() {
+            if (lastCalculation) {
+                savedResults.push(lastCalculation);
+                lastCalculation = null;
+                saveAndRender();
+                displayMessage('התוצאה נוספה בהצלחה!', 'success');
+                setTimeout(() => { if (!lastCalculation) resultDisplay.innerHTML = ''; }, 2000);
+            }
+        }
+        
+        function saveAndRender() {
+            localStorage.setItem('pe_grades', JSON.stringify(savedResults));
+            renderTable();
+        }
+
+        function renderTable() {
+            resultsBody.innerHTML = '';
+            const hasResults = savedResults.length > 0;
+            noResultsP.style.display = hasResults ? 'none' : 'block';
+            exportBtn.disabled = !hasResults;
+            clearBtn.disabled = !hasResults;
+            analyzeBtn.disabled = savedResults.length < 3;
+            analyzeBtn.title = savedResults.length < 3 ? 'יש צורך בלפחות 3 תוצאות שמורות' : 'נתח ביצועי כיתה';
+
+
+            savedResults.forEach((res, index) => {
+                const row = document.createElement('tr');
+                row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                row.innerHTML = `
+                    <td>${res.name}</td>
+                    <td>${res.gradeLevel}'</td>
+                    <td>${res.classNum}</td>
+                    <td>${res.testType}</td>
+                    <td>${res.result}</td>
+                    <td><span class="font-bold text-blue-600">${res.score}</span></td>
+                    <td>
+                        <button class="delete-btn text-red-500 hover:text-red-700" data-index="${index}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                resultsBody.appendChild(row);
+            });
+        }
+        
+        function deleteResult(index) {
+            savedResults.splice(index, 1);
+            saveAndRender();
+        }
+
+        function exportToCsv() {
+            if (savedResults.length === 0) return;
+            const headers = ['שם התלמיד', 'שכבה', 'כיתה', 'מבדק', 'תוצאה', 'ציון'];
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += headers.join(',') + '\r\n';
+            savedResults.forEach(res => {
+                const row = [res.name, res.gradeLevel, res.classNum, res.testType, `"${res.result}"`, res.score];
+                csvContent += row.join(',') + '\r\n';
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "pe_grades_export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function loadFromStorage() {
+            const data = localStorage.getItem('pe_grades');
+            if (data) {
+                savedResults = JSON.parse(data);
+            }
+        }
+
+        // Event Listeners
+        gradeLevelSelect.addEventListener('change', populateTestTypes);
+        testTypeSelect.addEventListener('change', updateUnit);
+        calculateBtn.addEventListener('click', handleCalculation);
+        exportBtn.addEventListener('click', exportToCsv);
+        analyzeBtn.addEventListener('click', generateClassAnalysis);
+        
+        clearBtn.addEventListener('click', () => confirmModal.style.display = 'flex');
+        cancelClearBtn.addEventListener('click', () => confirmModal.style.display = 'none');
+        
+        confirmClearBtn.addEventListener('click', () => {
+            savedResults = [];
+            saveAndRender();
+            confirmModal.style.display = 'none';
+        });
+
+        resultsBody.addEventListener('click', (e) => {
+            const deleteButton = e.target.closest('.delete-btn');
+            if (deleteButton) {
+                const index = deleteButton.dataset.index;
+                deleteResult(index);
+            }
+        });
+        
+        geminiModal.addEventListener('click', (e) => {
+            if(e.target === geminiModal) {
+                geminiModal.style.display = 'none';
+            }
+        });
+
+        // Initial Setup
+        document.addEventListener('DOMContentLoaded', () => {
+            populateTestTypes();
+            loadFromStorage();
+            renderTable();
+        });
+
+    </script>
+</body>
+</html>
