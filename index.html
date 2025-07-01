@@ -482,15 +482,21 @@
 
 
             savedResults.forEach((res, index) => {
+                // Determine if the student failed
+                const isFail = res.score < 60;
+                // Set row class for fail or alternating background
+                const rowClass = isFail ? 'bg-red-100 text-red-700' : (index % 2 === 0 ? 'bg-white' : 'bg-gray-50');
+                // Determine score color
+                const scoreColor = isFail ? 'text-red-700' : 'text-blue-600';
                 const row = document.createElement('tr');
-                row.className = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                row.className = rowClass;
                 row.innerHTML = `
                     <td>${res.name}</td>
                     <td>${res.gradeLevel}'</td>
                     <td>${res.classNum}</td>
                     <td>${res.testType}</td>
                     <td>${res.result}</td>
-                    <td><span class="font-bold text-blue-600">${res.score}</span></td>
+                    <td><span class="font-bold ${scoreColor}">${res.score}</span></td>
                     <td>
                         <button class="delete-btn text-red-500 hover:text-red-700" data-index="${index}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
