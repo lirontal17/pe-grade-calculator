@@ -71,7 +71,9 @@
 </head><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 
-<body class="bg-gray-100">
+<body class="bg-gray-100"><input id="excelInput" type="file" accept=".xlsx,.xls,.csv">
+
+
     <div class="container mx-auto p-4 md:p-8">
         <!-- Calculator Card -->
         <div class="w-full max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg mb-8">
@@ -172,6 +174,16 @@
             <!-- Gemini response will be injected here -->
         </div>
     </div>
+    <div id="columnSelectModal" class="modal-backdrop">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold mb-4">בחר עמודת שמות</h3>
+            <p class="mb-4">בחר את העמודה שמכילה את שמות התלמידים מתוך הקובץ שהעלית:</p>
+            <select id="columnSelect" class="form-select w-full mb-6"></select>
+            <div class="flex justify-center gap-4">
+                <button id="confirmColumnBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">אישור</button>
+            </div>
+        </div>
+    </div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -229,6 +241,11 @@
         const cancelClearBtn = document.getElementById('cancelClearBtn');
         const geminiModal = document.getElementById('geminiModal');
         const geminiModalContent = document.getElementById('geminiModalContent');
+        const columnSelectModal = document.getElementById('columnSelectModal');
+        const columnSelect = document.getElementById('columnSelect');
+        const confirmColumnBtn = document.getElementById('confirmColumnBtn');
+        let excelRows = [];
+        let excelHeaders = [];
 
         // App State
         let savedResults = [];
@@ -609,20 +626,39 @@
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-            uploadedStudentNames = [];
-            for (const row of rows) {
-              const name = (row[0] || '').toString().trim();
-              if (name) uploadedStudentNames.push(name);
-            }
-            // הפוך את שדה שם התלמיד ל-select עם כל השמות
-            const select = document.createElement('select');
-            select.id = 'studentName';
-            select.className = 'form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg';
-            select.innerHTML = '<option value="">בחר תלמיד/ה</option>' + uploadedStudentNames.map(name => `<option value="${name}">${name}</option>`).join('');
-            studentNameInput.parentNode.replaceChild(select, studentNameInput);
+            // נקרא את כל השורות כאובייקטים (headers)
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '', header: 1 });
+            excelRows = rows;
+            if (rows.length === 0) return;
+            excelHeaders = rows[0];
+            // נבנה select עם כל הכותרות
+            columnSelect.innerHTML = excelHeaders.map((header, idx) => `<option value="${idx}">${header || 'עמודה #' + (idx+1)}</option>`).join('');
+            columnSelectModal.style.display = 'flex';
           };
           reader.readAsArrayBuffer(file);
+        });
+
+        confirmColumnBtn.addEventListener('click', function() {
+          const colIdx = parseInt(columnSelect.value);
+          uploadedStudentNames = [];
+          for (let i = 1; i < excelRows.length; i++) { // מתחילים משורה 1 (לא 0)
+            const name = (excelRows[i][colIdx] || '').toString().trim();
+            if (name) uploadedStudentNames.push(name);
+          }
+          // הפוך את שדה שם התלמיד ל-select עם כל השמות
+          const select = document.createElement('select');
+          select.id = 'studentName';
+          select.className = 'form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg';
+          select.innerHTML = '<option value="">בחר תלמיד/ה</option>' + uploadedStudentNames.map(name => `<option value="${name}">${name}</option>`).join('');
+          const oldInput = document.getElementById('studentName');
+          if (oldInput) oldInput.parentNode.replaceChild(select, oldInput);
+          columnSelectModal.style.display = 'none';
+        });
+        // סגירה בלחיצה מחוץ למודל
+        columnSelectModal.addEventListener('click', (e) => {
+          if(e.target === columnSelectModal) {
+            columnSelectModal.style.display = 'none';
+          }
         });
 
         function addStudentRow(selectedName = '', result = '') {
