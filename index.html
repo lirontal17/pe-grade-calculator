@@ -227,6 +227,7 @@
         // App State
         let savedResults = [];
         let lastCalculation = null;
+        let uploadedStudentNames = [];
 
         // --- Gemini API ---
         const API_KEY = ""; // Kept empty as per instructions
@@ -601,16 +602,93 @@
           reader.onload = function(e) {
             const data = new Uint8Array(e.target.result);
             const workbook = XLSX.read(data, { type: 'array' });
-            // נניח שהשמות בעמודה הראשונה של הגיליון הראשון
             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            uploadedStudentNames = [];
             for (const row of rows) {
               const name = (row[0] || '').toString().trim();
-              if (name) addStudentRow(name, '');
+              if (name) uploadedStudentNames.push(name);
             }
+            document.getElementById('studentsBody').innerHTML = '';
+            addStudentRow();
           };
           reader.readAsArrayBuffer(file);
         });
+
+        function addStudentRow(selectedName = '', result = '') {
+          if (uploadedStudentNames.length === 0) {
+            alert('יש להעלות קובץ שמות תלמידים לפני הוספת שורות!');
+            return;
+          }
+          const tbody = document.getElementById('studentsBody');
+          const tr = document.createElement('tr');
+          let options = '<option value="">בחר שם</option>';
+          for (const name of uploadedStudentNames) {
+            options += `<option value="${name}" ${name === selectedName ? 'selected' : ''}>${name}</option>`;
+          }
+          tr.innerHTML = `
+            <td>
+              <select class="form-select w-full rounded">${options}</select>
+            </td>
+            <td><input type="text" class="form-input w-full rounded ltr" value="${result}"></td>
+            <td class="grade-cell"></td>
+            <td><button class="removeBtn text-red-600 hover:text-red-800">✖</button></td>
+          `;
+          tbody.appendChild(tr);
+          tr.querySelector('.removeBtn').onclick = () => tr.remove();
+        }
+
+        const addRowBtn = document.getElementById('addRowBtn');
+        if (addRowBtn) {
+          addRowBtn.onclick = () => addStudentRow();
+        }
+
+        const calcAllBtn = document.getElementById('calcAllBtn');
+        if (calcAllBtn) {
+          calcAllBtn.onclick = () => {
+            const testType = document.getElementById('testType').value;
+            document.querySelectorAll('#studentsBody tr').forEach(tr => {
+              const name = tr.children[0].querySelector('select').value.trim();
+              const resultInput = tr.children[1].querySelector('input');
+              const result = parseFloat(resultInput.value.replace(',', '.'));
+              const gradeCell = tr.children[2];
+              tr.classList.remove('fail-row', 'excellent-row');
+              resultInput.classList.remove('invalid');
+              gradeCell.textContent = '';
+              if (!name || isNaN(result)) {
+                resultInput.classList.add('invalid');
+                gradeCell.textContent = '';
+                return;
+              }
+              const grade = calcGrade(testType, result);
+              gradeCell.textContent = grade;
+              if (grade === '') {
+                resultInput.classList.add('invalid');
+              } else if (grade < 60) {
+                tr.classList.add('fail-row');
+              } else if (grade >= 90) {
+                tr.classList.add('excellent-row');
+              }
+            });
+          };
+        }
+
+        exportBtn.onclick = () => {
+          let csv = 'שם תלמיד,תוצאה,ציון\n';
+          document.querySelectorAll('#studentsBody tr').forEach(tr => {
+            const name = tr.children[0].querySelector('select').value.trim();
+            const result = tr.children[1].querySelector('input').value.trim();
+            const grade = tr.children[2].textContent.trim();
+            if (name && result && grade) {
+              csv += `${name},${result},${grade}\n`;
+            }
+          });
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = 'grades.csv';
+          link.click();
+        };
 
         // Initial Setup
         document.addEventListener('DOMContentLoaded', () => {
