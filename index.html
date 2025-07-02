@@ -68,7 +68,9 @@
             100% { transform: rotate(360deg); }
         }
     </style>
-</head>
+</head><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+
 <body class="bg-gray-100">
     <div class="container mx-auto p-4 md:p-8">
         <!-- Calculator Card -->
@@ -78,7 +80,11 @@
                 <div>
                     <label for="studentName" class="block text-lg font-medium text-gray-700">שם התלמיד/ה</label>
                     <input type="text" id="studentName" class="form-input mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg" placeholder="לדוגמה: ישראל ישראלי">
-                </div>
+                </div><div class="mb-4">
+                    <label class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">העלה קובץ Excel/CSV</label>
+                    <input id="excelInput" type="file" accept=".xlsx,.xls,.csv" class="form-input">
+                  </div>
+                  
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label for="gradeLevel" class="block text-lg font-medium text-gray-700">שכבה</label>
@@ -609,8 +615,12 @@
               const name = (row[0] || '').toString().trim();
               if (name) uploadedStudentNames.push(name);
             }
-            document.getElementById('studentsBody').innerHTML = '';
-            addStudentRow();
+            // הפוך את שדה שם התלמיד ל-select עם כל השמות
+            const select = document.createElement('select');
+            select.id = 'studentName';
+            select.className = 'form-select mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-lg';
+            select.innerHTML = '<option value="">בחר תלמיד/ה</option>' + uploadedStudentNames.map(name => `<option value="${name}">${name}</option>`).join('');
+            studentNameInput.parentNode.replaceChild(select, studentNameInput);
           };
           reader.readAsArrayBuffer(file);
         });
@@ -697,6 +707,25 @@
             renderTable();
         });
 
-    </script>
+    </script><script>
+  document.getElementById('excelInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+      console.log('🟢 נתונים מהקובץ:', rows);
+      // כאן תוכל להכניס את הנתונים לטבלה שלך
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
+</script>
+
 </body>
 </html>
