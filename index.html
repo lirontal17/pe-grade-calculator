@@ -111,6 +111,14 @@
             <div id="resultDisplay" class="mt-6 text-center text-2xl font-bold text-gray-800 min-h-[5rem] flex flex-col justify-center items-center"></div>
         </div>
 
+        <!-- העלאת קובץ אקסל/CSV -->
+        <div class="flex items-center gap-2 mb-4">
+          <label class="bg-gray-200 px-4 py-2 rounded cursor-pointer hover:bg-gray-300">
+            העלה קובץ אקסל/CSV
+            <input id="excelInput" type="file" accept=".xlsx,.xls,.csv" class="hidden">
+          </label>
+        </div>
+
         <!-- Saved Results Card -->
         <div class="w-full max-w-5xl mx-auto bg-white p-8 rounded-xl shadow-lg">
              <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
@@ -160,6 +168,7 @@
     </div>
 
 
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         // Data parsed from the provided documents.
         const gradesData = {
@@ -583,6 +592,24 @@
             if(e.target === geminiModal) {
                 geminiModal.style.display = 'none';
             }
+        });
+
+        document.getElementById('excelInput').addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            // נניח שהשמות בעמודה הראשונה של הגיליון הראשון
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+            for (const row of rows) {
+              const name = (row[0] || '').toString().trim();
+              if (name) addStudentRow(name, '');
+            }
+          };
+          reader.readAsArrayBuffer(file);
         });
 
         // Initial Setup
