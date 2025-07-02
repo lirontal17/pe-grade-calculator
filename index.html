@@ -482,12 +482,30 @@
 
 
             savedResults.forEach((res, index) => {
-                // Determine if the student failed
+                // Determine if the student failed or excelled
                 const isFail = res.score < 60;
-                // Set row class for fail or alternating background
-                const rowClass = isFail ? 'bg-red-100 text-red-700' : (index % 2 === 0 ? 'bg-white' : 'bg-gray-50');
+                const isExcellent = res.score >= 90;
+                
+                // Set row class for fail, excellent, or alternating background
+                let rowClass;
+                if (isFail) {
+                    rowClass = 'bg-red-100 text-red-700';
+                } else if (isExcellent) {
+                    rowClass = 'bg-green-100 text-green-700';
+                } else {
+                    rowClass = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                }
+                
                 // Determine score color
-                const scoreColor = isFail ? 'text-red-700' : 'text-blue-600';
+                let scoreColor;
+                if (isFail) {
+                    scoreColor = 'text-red-700';
+                } else if (isExcellent) {
+                    scoreColor = 'text-green-700';
+                } else {
+                    scoreColor = 'text-blue-600';
+                }
+                
                 const row = document.createElement('tr');
                 row.className = rowClass;
                 row.innerHTML = `
