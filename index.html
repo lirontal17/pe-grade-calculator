@@ -753,3 +753,10 @@
 
 </body>
 </html>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker רשום:', reg))
+      .catch(err => console.error('Service Worker שגיאה:', err));
+  }
+</script>
